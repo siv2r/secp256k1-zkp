@@ -83,6 +83,7 @@ esac
     --enable-module-schnorrsig="$SCHNORRSIG"  --enable-module-musig="$MUSIG" --enable-module-ecdsa-adaptor="$ECDSAADAPTOR" \
     --enable-module-schnorrsig="$SCHNORRSIG" \
     --enable-module-schnorrsig-halfagg="$SCHNORRSIG_HALFAGG" \
+    --enable-module-schnorr-adaptor="$SCHNORRADAPTOR" \
     --enable-examples="$EXAMPLES" \
     --enable-ctime-tests="$CTIMETESTS" \
     --with-valgrind="$WITH_VALGRIND" \
