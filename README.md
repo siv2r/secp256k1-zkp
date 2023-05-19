@@ -3,7 +3,7 @@ libsecp256k1-zkp
 
 ![Dependencies: None](https://img.shields.io/badge/dependencies-none-success)
 
-A fork of [libsecp256k1](https://github.com/bitcoin-core/secp256k1) with support for advanced and experimental features such as Confidential Assets and MuSig2 
+A fork of [libsecp256k1](https://github.com/bitcoin-core/secp256k1) with support for advanced and experimental features such as Confidential Assets and MuSig2
 
 Added features:
 * Experimental module for ECDSA adaptor signatures.
@@ -72,6 +72,7 @@ Usage examples
 Usage examples can be found in the [examples](examples) directory. To compile them you need to configure with `--enable-examples`.
   * [ECDSA example](examples/ecdsa.c)
   * [Schnorr signatures example](examples/schnorr.c)
+  * [Schnorr adaptor signatures example](examples/schnorr_adaptor.c)
   * [Deriving a shared secret (ECDH) example](examples/ecdh.c)
   * [MuSig example](examples/musig.c)
 
