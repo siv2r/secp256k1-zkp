@@ -199,19 +199,48 @@ static void run_tests(secp256k1_context *ctx, unsigned char *key) {
 
 #ifdef ENABLE_MODULE_SCHNORR_ADAPTOR
     {
-        unsigned char t[33];
+        unsigned char pre_sig[65];
+        unsigned char bip340_sig[64];
+        unsigned char adaptor[32];
+        unsigned char expected_adaptor[32];
+        unsigned char adaptor_pk_cmprssd[33];
+        secp256k1_pubkey adaptor_pubkey;
+        size_t cmprssd_pklen = 33;
 
-        for (i = 0; i < 33; i++) {
-            t[i] = i + 2;
+        for (i = 0; i < 32; i++) {
+            adaptor[i] = i + 2;
         }
 
-        SECP256K1_CHECKMEM_UNDEFINE(key, 32);
-        ret = secp256k1_keypair_create(ctx, &keypair, key);
+        ret = secp256k1_ec_pubkey_create(ctx, &adaptor_pubkey, adaptor);
+        CHECK(ret == 1);
+
+        ret = secp256k1_ec_pubkey_serialize(ctx, adaptor_pk_cmprssd, &cmprssd_pklen, &adaptor_pubkey, SECP256K1_EC_COMPRESSED);
+        CHECK(ret == 1);
+
+        SECP256K1_CHECKMEM_DEFINE(key, 32);
+        CHECK(secp256k1_keypair_create(ctx, &keypair, key));
+
+        SECP256K1_CHECKMEM_UNDEFINE(&keypair, sizeof(keypair));
+        ret = secp256k1_schnorr_adaptor_presign(ctx, pre_sig, msg, &keypair, adaptor_pk_cmprssd, NULL);
         SECP256K1_CHECKMEM_DEFINE(&ret, sizeof(ret));
         CHECK(ret == 1);
-        ret = secp256k1_schnorr_adaptor_presign(ctx, sig, msg, &keypair, t, NULL);
+
+        SECP256K1_CHECKMEM_UNDEFINE(adaptor, sizeof(adaptor));
+        SECP256K1_CHECKMEM_DEFINE(pre_sig, sizeof(pre_sig));
+        ret = secp256k1_schnorr_adaptor_adapt(ctx, bip340_sig, pre_sig, adaptor);
         SECP256K1_CHECKMEM_DEFINE(&ret, sizeof(ret));
         CHECK(ret == 1);
+
+        SECP256K1_CHECKMEM_UNDEFINE(bip340_sig, sizeof(bip340_sig));
+        ret = secp256k1_schnorr_adaptor_extract_adaptor(ctx, expected_adaptor, pre_sig, bip340_sig);
+        SECP256K1_CHECKMEM_DEFINE(&ret, sizeof(ret));
+        CHECK(ret == 1);
+
+        SECP256K1_CHECKMEM_DEFINE(adaptor, sizeof(adaptor));
+        SECP256K1_CHECKMEM_DEFINE(expected_adaptor, sizeof(expected_adaptor));
+        ret = secp256k1_memcmp_var(adaptor, expected_adaptor, sizeof(expected_adaptor));
+        SECP256K1_CHECKMEM_DEFINE(&ret, sizeof(ret));
+        CHECK(ret == 0);
     }
 #endif
 
