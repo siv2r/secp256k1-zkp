@@ -214,7 +214,7 @@ AC_ARG_ENABLE(module_ellswift,
     [SECP_SET_DEFAULT([enable_module_ellswift], [yes], [yes])])
 
 AC_ARG_ENABLE(module_schnorr_adaptor,
-    AS_HELP_STRING([--enable-module-schnorr-adaptor],[enable schnorr adaptor module [default=no]]), [],
+    AS_HELP_STRING([--enable-module-schnorr-adaptor],[enable Schnorr adaptor module [default=no]]), [],
     [SECP_SET_DEFAULT([enable_module_schnorr_adaptor], [no], [yes])])
 
 AC_ARG_ENABLE(module_ecdsa_s2c,
@@ -461,6 +461,11 @@ if test x"$enable_module_musig" = x"yes"; then
   enable_module_schnorrsig=yes
 fi
 
+if test x"$enable_module_schnorr_adaptor" = x"yes"; then
+  SECP_CONFIG_DEFINES="$SECP_CONFIG_DEFINES -DENABLE_MODULE_SCHNORR_ADAPTOR=1"
+  enable_module_schnorrsig=yes
+fi
+
 if test x"$enable_module_recovery" = x"yes"; then
   SECP_CONFIG_DEFINES="$SECP_CONFIG_DEFINES -DENABLE_MODULE_RECOVERY=1"
 fi
@@ -492,12 +497,6 @@ fi
 if test x"$enable_module_schnorrsig" = x"yes"; then
   SECP_CONFIG_DEFINES="$SECP_CONFIG_DEFINES -DENABLE_MODULE_SCHNORRSIG=1"
   enable_module_extrakeys=yes
-fi
-
-if test x"$enable_module_schnorr_adaptor" = x"yes"; then
-  AC_DEFINE(ENABLE_MODULE_SCHNORR_ADAPTOR, 1, [Define thsi symbol to enable the Schnorr adaptor module])
-  enable_module_extrakeys=yes
-  enable_module_schnorrsig=yes
 fi
 
 if test x"$enable_module_ellswift" = x"yes"; then
