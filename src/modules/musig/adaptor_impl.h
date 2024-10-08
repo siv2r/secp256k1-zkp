@@ -28,7 +28,6 @@ int secp256k1_musig_nonce_parity(const secp256k1_context* ctx, int *nonce_parity
     return 1;
 }
 
-/* TODO: musig2 consideres `t` (secadaptor) to be secret. And `s` (pre-signature) to be public*/
 int secp256k1_musig_adapt(const secp256k1_context* ctx, unsigned char *sig64, const unsigned char *pre_sig64, const unsigned char *sec_adaptor32, int nonce_parity) {
     secp256k1_scalar s;
     secp256k1_scalar t;

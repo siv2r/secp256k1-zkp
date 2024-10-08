@@ -43,10 +43,10 @@ static void secp256k1_nonce_function_schnorr_adaptor_sha256_tagged_aux(secp256k1
     sha->bytes = 64;
 }
 
-/* algo argument for adaptor_nonce_function_bip340 to derive the nonce of Schnorr adaptor signature
- * by using the correct tagged hash function. */
-static const unsigned char adaptor_bip340_algo[20] = "SchnorrAdaptor/nonce";
+/* algo argument for `nonce_function_schnorr_adaptor` to derive the nonce using a tagged hash function. */
+static const unsigned char schnorr_adaptor_algo[20] = "SchnorrAdaptor/nonce";
 
+/* Modified BIP-340 nonce function */
 static int nonce_function_schnorr_adaptor(unsigned char *nonce32, const unsigned char *msg32, const unsigned char *key32, const unsigned char *adaptor33, const unsigned char *xonly_pk32, const unsigned char *algo, size_t algolen, void *data) {
     secp256k1_sha256 sha;
     unsigned char masked_key[32];
@@ -64,12 +64,13 @@ static int nonce_function_schnorr_adaptor(unsigned char *nonce32, const unsigned
             masked_key[i] ^= key32[i];
         }
     } else {
+        /* TODO: check if ZERO_MASK is correct*/
         /* Precomputed TaggedHash("SchnorrAdaptor/aux", 0x0000...00); */
         static const unsigned char ZERO_MASK[32] = {
               65, 206, 231, 5, 44, 99, 30, 162,
-              119, 101, 143, 108, 176, 134, 217, 23,
-              54, 150, 157, 221, 198, 161, 164, 85,
-              235, 82, 28, 56, 164, 220, 113, 53
+             119, 101, 143, 108, 176, 134, 217, 23,
+             54, 150, 157, 221, 198, 161, 164, 85,
+             235, 82, 28, 56, 164, 220, 113, 53
         };
         for (i = 0; i < 32; i++) {
             masked_key[i] = key32[i] ^ ZERO_MASK[i];
@@ -77,15 +78,16 @@ static int nonce_function_schnorr_adaptor(unsigned char *nonce32, const unsigned
     }
 
     /* Tag the hash with algo which is important to avoid nonce reuse across
-     * algorithms. */
-    if (algolen == sizeof(adaptor_bip340_algo)
-            && secp256k1_memcmp_var(algo, adaptor_bip340_algo, algolen) == 0) {
+     * algorithms. An optimized tagging implementation is used if the default
+     * tag is provided. */
+    if (algolen == sizeof(schnorr_adaptor_algo)
+            && secp256k1_memcmp_var(algo, schnorr_adaptor_algo, algolen) == 0) {
         secp256k1_nonce_function_schnorr_adaptor_sha256_tagged(&sha);
     } else {
         secp256k1_sha256_initialize_tagged(&sha, algo, algolen);
     }
 
-    /* Hash masked-key||adaptor33||msg using the tagged hash */
+    /* Hash masked-key||adaptor33||pk||msg using the tagged hash */
     secp256k1_sha256_write(&sha, masked_key, 32);
     secp256k1_sha256_write(&sha, adaptor33, 33);
     secp256k1_sha256_write(&sha, xonly_pk32, 32);
@@ -96,27 +98,23 @@ static int nonce_function_schnorr_adaptor(unsigned char *nonce32, const unsigned
 
 const secp256k1_nonce_function_hardened_schnorr_adaptor secp256k1_nonce_function_schnorr_adaptor = nonce_function_schnorr_adaptor;
 
-static int secp256k1_schnorr_adaptor_presign_internal(const secp256k1_context *ctx, unsigned char *presig65, const unsigned char *msg32, const secp256k1_keypair *keypair, secp256k1_nonce_function_hardened_schnorr_adaptor noncefp, const secp256k1_pubkey *adaptor, void *ndata) {
+static int secp256k1_schnorr_adaptor_presign_internal(const secp256k1_context *ctx, unsigned char *pre_sig65, const unsigned char *msg32, const secp256k1_keypair *keypair, const secp256k1_pubkey *adaptor, secp256k1_nonce_function_hardened_schnorr_adaptor noncefp, void *ndata) {
     secp256k1_scalar sk;
     secp256k1_scalar e;
     secp256k1_scalar k;
-    secp256k1_gej rj;
-    secp256k1_gej r0j;
+    secp256k1_gej rj, rpj;
+    secp256k1_ge r, rp;
     secp256k1_ge pk;
-    secp256k1_ge r;
-    secp256k1_ge r0;
-    secp256k1_ge t;
+    secp256k1_ge adaptor_ge;
     unsigned char nonce32[32] = {0};
     unsigned char pk_buf[32];
     unsigned char seckey[32];
-    unsigned char adaptor33_buff[33];
-    size_t size = 33;
-    size_t msglen = 32;
+    unsigned char adaptor_buff[33];
     int ret = 1;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secp256k1_ecmult_gen_context_is_built(&ctx->ecmult_gen_ctx));
-    ARG_CHECK(presig65 != NULL);
+    ARG_CHECK(pre_sig65 != NULL);
     ARG_CHECK(msg32 != NULL);
     ARG_CHECK(keypair != NULL);
     ARG_CHECK(adaptor != NULL);
@@ -126,51 +124,55 @@ static int secp256k1_schnorr_adaptor_presign_internal(const secp256k1_context *c
     }
 
     ret &= secp256k1_keypair_load(ctx, &sk, &pk, keypair);
-
+    /* Because we are signing for a x-only pubkey, the secret key is negated
+     * before signing if the point corresponding to the secret key does not
+     * have an even Y. */
     if (secp256k1_fe_is_odd(&pk.y)) {
         secp256k1_scalar_negate(&sk, &sk);
     }
 
-    /* d */
+    /* Generate the nonce k */
     secp256k1_scalar_get_b32(seckey, &sk);
-    /* bytes_from_point(P) */
     secp256k1_fe_get_b32(pk_buf, &pk.x);
-
-    /* T = cpoint(T) */
-    ret &= secp256k1_pubkey_load(ctx, &t, adaptor);
-    ret &= secp256k1_eckey_pubkey_serialize(&t, adaptor33_buff, &size, 1);
-
-    ret &= !!noncefp(nonce32, msg32, seckey, adaptor33_buff, pk_buf, adaptor_bip340_algo, sizeof(adaptor_bip340_algo), ndata);
-    /* k0 */
+    /* T := adaptor_ge */
+    ret &= secp256k1_pubkey_load(ctx, &adaptor_ge, adaptor);
+    ret &= secp256k1_eckey_pubkey_serialize(&adaptor_ge, adaptor_buff, 33, 1);
+    ret &= !!noncefp(nonce32, msg32, seckey, adaptor_buff, pk_buf, schnorr_adaptor_algo, sizeof(schnorr_adaptor_algo), ndata);
     secp256k1_scalar_set_b32(&k, nonce32, NULL);
     ret &= !secp256k1_scalar_is_zero(&k);
     secp256k1_scalar_cmov(&k, &secp256k1_scalar_one, !ret);
 
-    /* R = k0*G */
+    /* R = k*G */
     secp256k1_ecmult_gen(&ctx->ecmult_gen_ctx, &rj, &k);
     secp256k1_ge_set_gej(&r, &rj);
+    /* We declassify the non-secret values R and T to allow using them
+     * as branch points. */
+    secp256k1_declassify(ctx, &r, sizeof(rp));
+    secp256k1_declassify(ctx, &adaptor_ge, sizeof(rp));
 
-    /* R' = k*G + T, can use gej_add_ge_var since r and t aren't secret */
-    secp256k1_gej_add_ge_var(&r0j, &rj, &t, NULL);
-    secp256k1_ge_set_gej(&r0, &r0j);
+    /* R' = R + T */
+    secp256k1_gej_add_ge_var(&rpj, &rj, &adaptor_ge, NULL);
+    secp256k1_ge_set_gej(&rp, &rpj);
 
-    /* We declassify R' to allow using it as a branch point. This is fine
-     * because R' is not a secret.  */
-    secp256k1_declassify(ctx, &r0, sizeof(r0));
-    secp256k1_fe_normalize_var(&r0.y);
-    if (secp256k1_fe_is_odd(&r0.y)) {
+    /* We declassify R' (non-secret value) to branch on it */
+    secp256k1_declassify(ctx, &rp, sizeof(rp));
+    secp256k1_fe_normalize_var(&rp.y);
+
+    /* s =  k + e * d when R'.y is even
+     *   = -k + e * d when R'.y is odd
+     * TODO: explain the negation here?
+     * just say here we negate based on R' rather than R because R'
+     * will be in the final bip340 signature */
+    if (secp256k1_fe_is_odd(&rp.y)) {
         secp256k1_scalar_negate(&k, &k);
     }
-
-    ret &= secp256k1_eckey_pubkey_serialize(&r0, presig65, &size, 1);
-
-    secp256k1_schnorrsig_challenge(&e, &presig65[1], msg32, msglen, pk_buf);
+    secp256k1_schnorrsig_challenge(&e, &pre_sig65[1], msg32, 32, pk_buf);
     secp256k1_scalar_mul(&e, &e, &sk);
-    /* k + e * d */
     secp256k1_scalar_add(&e, &e, &k);
-    secp256k1_scalar_get_b32(&presig65[33], &e);
+    secp256k1_scalar_get_b32(&pre_sig65[33], &e);
+    ret &= secp256k1_eckey_pubkey_serialize(&rp, pre_sig65, 33, 1);
 
-    secp256k1_memczero(presig65, 65, !ret);
+    secp256k1_memczero(pre_sig65, 65, !ret);
     secp256k1_scalar_clear(&k);
     secp256k1_scalar_clear(&sk);
     memset(seckey, 0, sizeof(seckey));
@@ -178,81 +180,76 @@ static int secp256k1_schnorr_adaptor_presign_internal(const secp256k1_context *c
     return ret;
 }
 
-int secp256k1_schnorr_adaptor_presign(const secp256k1_context *ctx, unsigned char *presig65, const unsigned char *msg32, const secp256k1_keypair *keypair, const secp256k1_pubkey *adaptor, const unsigned char *aux_rand32) {
+int secp256k1_schnorr_adaptor_presign(const secp256k1_context *ctx, unsigned char *pre_sig65, const unsigned char *msg32, const secp256k1_keypair *keypair, const secp256k1_pubkey *adaptor, const unsigned char *aux_rand32) {
     /* We cast away const from the passed aux_rand32 argument since we know the default nonce function does not modify it. */
-    return secp256k1_schnorr_adaptor_presign_internal(ctx, presig65, msg32, keypair, secp256k1_nonce_function_schnorr_adaptor, adaptor, (unsigned char*)aux_rand32);
+    return secp256k1_schnorr_adaptor_presign_internal(ctx, pre_sig65, msg32, keypair, adaptor, secp256k1_nonce_function_schnorr_adaptor, (unsigned char*)aux_rand32);
 }
 
-int secp256k1_schnorr_adaptor_extract(const secp256k1_context *ctx, secp256k1_pubkey *adaptor, const unsigned char *presig65, const unsigned char *msg32, const secp256k1_xonly_pubkey *pubkey) {
-    secp256k1_scalar s0;
+
+int secp256k1_schnorr_adaptor_extract(const secp256k1_context *ctx, secp256k1_pubkey *adaptor, const unsigned char *pre_sig65, const unsigned char *msg32, const secp256k1_xonly_pubkey *pubkey) {
+    secp256k1_scalar s;
     secp256k1_scalar e;
-    secp256k1_gej rj;
     secp256k1_ge pk;
     secp256k1_gej pkj;
-    secp256k1_ge r0;
-    secp256k1_ge t;
-    secp256k1_gej tj;
-    secp256k1_xonly_pubkey pkr0;
+    secp256k1_ge adaptor_ge;
+    secp256k1_gej adaptor_gej;
+    secp256k1_gej rj;
+    secp256k1_ge rp;
     unsigned char buf[32];
-    size_t size = 33;
-    size_t msglen = 32;
     int overflow;
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(adaptor != NULL);
-    ARG_CHECK(presig65 != NULL);
+    ARG_CHECK(pre_sig65 != NULL);
     ARG_CHECK(msg32 != NULL);
     ARG_CHECK(pubkey != NULL);
 
-    /* P */
-    if (!secp256k1_xonly_pubkey_load(ctx, &pk, pubkey)) {
+    /* R' := pre_sig65[0:33] */
+    if (!secp256k1_eckey_pubkey_parse(&rp, &pre_sig65[0], 33)) {
         return 0;
     }
 
-    /* s0 */
-    secp256k1_scalar_set_b32(&s0, &presig65[33], &overflow);
+    secp256k1_scalar_set_b32(&s, &pre_sig65[33], &overflow);
     if (overflow) {
         return 0;
     }
 
-    /* R0 */
-    if (!secp256k1_xonly_pubkey_parse(ctx, &pkr0, &presig65[1])) {
-        return 0;
-    }
-    if (!secp256k1_xonly_pubkey_load(ctx, &r0, &pkr0)) {
+    if (!secp256k1_xonly_pubkey_load(ctx, &pk, pubkey)) {
         return 0;
     }
 
     /* Compute e */
     secp256k1_fe_get_b32(buf, &pk.x);
-    secp256k1_schnorrsig_challenge(&e, &presig65[1], msg32, msglen, buf);
+    secp256k1_schnorrsig_challenge(&e, &pre_sig65[1], msg32, 32, buf);
 
-    /* Compute rj = s0*G + (-e) * pkj */
+    /* Compute R = s*G - e*P */
     secp256k1_scalar_negate(&e, &e);
     secp256k1_gej_set_ge(&pkj, &pk);
-    secp256k1_ecmult(&rj, &pkj, &e, &s0);
-
-    /* R */
+    secp256k1_ecmult(&rj, &pkj, &e, &s);
     if (secp256k1_gej_is_infinity(&rj)) {
         return 0;
     }
 
-    /* T = R0 + (- R) */
-    secp256k1_gej_neg(&rj, &rj);
-    secp256k1_gej_add_ge_var(&tj, &rj, &r0, NULL);
-    if (presig65[0] == SECP256K1_TAG_PUBKEY_EVEN) {
-        ;
-    } else if (presig65[0] == SECP256K1_TAG_PUBKEY_ODD) {
-        secp256k1_gej_neg(&tj, &tj);
-    } else {
+    /* T =  R' - R when R'.y is even
+     *   =  R' + R when R'.y is odd 
+     * TODO: explain the negation here?
+     * just say here presign negates like this */
+    if (secp256k1_fe_is_odd(&rp.y)) {
+        secp256k1_gej_neg(&rj, &rj);
+    }
+    secp256k1_gej_add_ge_var(&adaptor_gej, &rp, &rj, NULL);
+    secp256k1_ge_set_gej(&adaptor_ge, &adaptor_gej);
+    if (secp256k1_ge_is_infinity(&adaptor_ge)) {
         return 0;
     }
-    secp256k1_ge_set_gej(&t, &tj);
-    secp256k1_pubkey_save(adaptor, &t);
+    secp256k1_pubkey_save(adaptor, &adaptor_ge);
 
     return 1;
 }
 
+/* TODO: musig2 consideres `t` (secadaptor) to be secret. And `s` (pre-signature) to be public*/
+/* should we consider bip340 signature to be secret? or public?
+ * I think it should be secret since, bip340 sig is computed by adding a secret t to presig */
 int secp256k1_schnorr_adaptor_adapt(const secp256k1_context *ctx, unsigned char *sig64, const unsigned char *pre_sig65, const unsigned char *sec_adaptor32) {
     secp256k1_scalar s;
     secp256k1_scalar t;
@@ -286,7 +283,7 @@ int secp256k1_schnorr_adaptor_adapt(const secp256k1_context *ctx, unsigned char 
     return 1;
 }
 
-int secp256k1_schnorr_adaptor_extract_sec(const secp256k1_context *ctx, unsigned char *secadaptor, const unsigned char *presig65, const unsigned char *sig64) {
+int secp256k1_schnorr_adaptor_extract_sec(const secp256k1_context *ctx, unsigned char *secadaptor, const unsigned char *pre_sig65, const unsigned char *sig64) {
     secp256k1_scalar s0;
     secp256k1_scalar s;
     secp256k1_scalar t;
@@ -294,12 +291,12 @@ int secp256k1_schnorr_adaptor_extract_sec(const secp256k1_context *ctx, unsigned
 
     VERIFY_CHECK(ctx != NULL);
     ARG_CHECK(secadaptor != NULL);
-    ARG_CHECK(presig65 != NULL);
-    ARG_CHECK(presig65[0] == SECP256K1_TAG_PUBKEY_EVEN || presig65[0] == SECP256K1_TAG_PUBKEY_ODD);
+    ARG_CHECK(pre_sig65 != NULL);
+    ARG_CHECK(pre_sig65[0] == SECP256K1_TAG_PUBKEY_EVEN || pre_sig65[0] == SECP256K1_TAG_PUBKEY_ODD);
     ARG_CHECK(sig64 != NULL);
 
     /* s0 */
-    secp256k1_scalar_set_b32(&s0, &presig65[33], &overflow);
+    secp256k1_scalar_set_b32(&s0, &pre_sig65[33], &overflow);
     if (overflow) {
         return 0;
     }
@@ -310,9 +307,9 @@ int secp256k1_schnorr_adaptor_extract_sec(const secp256k1_context *ctx, unsigned
         return 0;
     }
 
-    if (presig65[0] == SECP256K1_TAG_PUBKEY_EVEN) {
+    if (pre_sig65[0] == SECP256K1_TAG_PUBKEY_EVEN) {
         secp256k1_scalar_negate(&s0, &s0);
-    } else if (presig65[0] == SECP256K1_TAG_PUBKEY_ODD) {
+    } else if (pre_sig65[0] == SECP256K1_TAG_PUBKEY_ODD) {
         secp256k1_scalar_negate(&s, &s);
     }
     secp256k1_scalar_add(&t, &s0, &s);
