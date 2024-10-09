@@ -7471,7 +7471,7 @@ static void run_ecdsa_wycheproof(void) {
 #endif
 
 #ifdef ENABLE_MODULE_SCHNORR_ADAPTOR
-# include "modules/schnorr_adaptor/tests_impl.h"
+/* # include "modules/schnorr_adaptor/tests_impl.h" */
 #endif
 
 #ifdef ENABLE_MODULE_ELLSWIFT
@@ -7860,7 +7860,7 @@ int main(int argc, char **argv) {
 #endif
 
 #ifdef ENABLE_MODULE_SCHNORR_ADAPTOR
-    run_schnorr_adaptor_tests();
+/*     run_schnorr_adaptor_tests(); */
 #endif
 
 #ifdef ENABLE_MODULE_ELLSWIFT

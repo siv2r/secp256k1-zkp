@@ -112,6 +112,7 @@ static int secp256k1_schnorr_adaptor_presign_internal(const secp256k1_context *c
     unsigned char pk_buf[32];
     unsigned char seckey[32];
     unsigned char adaptor_buff[33];
+    size_t cmprssd_len = 33; /* for serializing `adaptor_ge` and `pre_sig65` */
     int ret = 1;
 
     VERIFY_CHECK(ctx != NULL);
@@ -138,7 +139,7 @@ static int secp256k1_schnorr_adaptor_presign_internal(const secp256k1_context *c
     secp256k1_fe_get_b32(pk_buf, &pk.x);
     /* T := adaptor_ge */
     ret &= secp256k1_pubkey_load(ctx, &adaptor_ge, adaptor);
-    ret &= secp256k1_eckey_pubkey_serialize(&adaptor_ge, adaptor_buff, 33, 1);
+    ret &= secp256k1_eckey_pubkey_serialize(&adaptor_ge, adaptor_buff, &cmprssd_len, 1);
     ret &= !!noncefp(nonce32, msg32, seckey, adaptor_buff, pk_buf, schnorr_adaptor_algo, sizeof(schnorr_adaptor_algo), ndata);
     secp256k1_scalar_set_b32(&k, nonce32, NULL);
     ret &= !secp256k1_scalar_is_zero(&k);
@@ -150,8 +151,8 @@ static int secp256k1_schnorr_adaptor_presign_internal(const secp256k1_context *c
 
     /* We declassify the non-secret values R and T to allow using them
      * as branch points. */
-    secp256k1_declassify(ctx, &r, sizeof(rp));
-    secp256k1_declassify(ctx, &adaptor_ge, sizeof(rp));
+    secp256k1_declassify(ctx, &rj, sizeof(rj));
+    secp256k1_declassify(ctx, &adaptor_ge, sizeof(adaptor_ge));
     /* R' = R + T */
     secp256k1_gej_add_ge_var(&rpj, &rj, &adaptor_ge, NULL);
     secp256k1_ge_set_gej(&rp, &rpj);
@@ -180,7 +181,7 @@ static int secp256k1_schnorr_adaptor_presign_internal(const secp256k1_context *c
     secp256k1_scalar_mul(&e, &e, &sk);
     secp256k1_scalar_add(&e, &e, &k);
     secp256k1_scalar_get_b32(&pre_sig65[33], &e);
-    ret &= secp256k1_eckey_pubkey_serialize(&rp, pre_sig65, 33, 1);
+    ret &= secp256k1_eckey_pubkey_serialize(&rp, pre_sig65, &cmprssd_len, 1);
 
     secp256k1_memczero(pre_sig65, 65, !ret);
     secp256k1_scalar_clear(&k);
@@ -252,7 +253,7 @@ int secp256k1_schnorr_adaptor_extract(const secp256k1_context *ctx, secp256k1_pu
     if (secp256k1_fe_is_odd(&rp.y)) {
         secp256k1_gej_neg(&rj, &rj);
     }
-    secp256k1_gej_add_ge_var(&adaptor_gej, &rp, &rj, NULL);
+    secp256k1_gej_add_ge_var(&adaptor_gej, &rj, &rp, NULL);
     secp256k1_ge_set_gej(&adaptor_ge, &adaptor_gej);
     if (secp256k1_ge_is_infinity(&adaptor_ge)) {
         return 0;
