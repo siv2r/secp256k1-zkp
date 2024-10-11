@@ -40,7 +40,7 @@ int main(void) {
      * for instance, the upstream PTLC secret he discovers. */
 	unsigned char sec_adaptor[32];
 	/* Secret adaptor t' (identical to t) that Alice extracts from
-     * her pre-signature and BIP340 signature  */
+     * the pre-signature and BIP340 signature  */
 	unsigned char extracted_sec_adaptor[32];
 
     secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
@@ -53,7 +53,7 @@ int main(void) {
 	}
 	/* Adaptor point T (= t*G) is given to Alice by original PTLC sender */
 	return_val = secp256k1_ec_pubkey_create(ctx, &adaptor_pk, sec_adaptor);
-	assert(return_val == 1);
+	assert(return_val);
 
     /* Alice generates her keypair, and the message hash to sign */
 	if (!fill_random(alice_seckey, sizeof(alice_seckey))) {
@@ -72,11 +72,11 @@ int main(void) {
 	/* Alice creates a pre-signature using the adaptor point T(=Z+A+B),
      * and sends it to Bob */
 	return_val = secp256k1_schnorr_adaptor_presign(ctx, pre_signature, msg_hash, &alice_keypair, &adaptor_pk, NULL);
-	assert(return_val == 1);
+	assert(return_val);
 
 	/* Bob extracts T from the pre-signature */
 	return_val = secp256k1_schnorr_adaptor_extract(ctx, &extracted_adaptor_pk, pre_signature, msg_hash, &alice_pubkey);
-    assert(return_val == 1);
+    assert(return_val);
     assert(secp256k1_ec_pubkey_cmp(ctx, &adaptor_pk, &extracted_adaptor_pk) == 0);
 
 	/* Bob forwards the PTLC. Bob's outgoing PTLC (Z+A+B+C) is claimed
@@ -84,7 +84,7 @@ int main(void) {
      * claim PTLC, subtracting local secret `c`.
      */
 	return_val = secp256k1_schnorr_adaptor_adapt(ctx, signature, pre_signature, sec_adaptor);
-	assert(return_val == 1);
+	assert(return_val);
     /* Signature should be valid! */
     is_signature_valid = secp256k1_schnorrsig_verify(ctx, signature, msg_hash, 32, &alice_pubkey);
 	assert(is_signature_valid);
@@ -96,9 +96,10 @@ int main(void) {
 	assert(memcmp(sec_adaptor, extracted_sec_adaptor, sizeof(sec_adaptor)) == 0);
 
 	/* Alice subtracts out local blinding factor `b`, can now claim incoming
-	 * PTLC from Alice with sec_adaptor(=z+a) */
+	 * PTLC from Alice with sec_adaptor(=z+a)
+	 */
 
-	printf("Success!\n");
-
+	printf("Success!\n\n");
+	secp256k1_context_destroy(ctx);
     return 0;
 }

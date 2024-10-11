@@ -108,7 +108,7 @@ static int secp256k1_schnorr_adaptor_presign_internal(const secp256k1_context *c
     secp256k1_ge r, rp;
     secp256k1_ge pk;
     secp256k1_ge adaptor_ge;
-    unsigned char nonce32[32] = {0};
+    unsigned char nonce32[32] = { 0 };
     unsigned char pk_buf[32];
     unsigned char seckey[32];
     unsigned char adaptor_buff[33];
@@ -177,11 +177,12 @@ static int secp256k1_schnorr_adaptor_presign_internal(const secp256k1_context *c
     if (secp256k1_fe_is_odd(&rp.y)) {
         secp256k1_scalar_negate(&k, &k);
     }
+    ret &= secp256k1_eckey_pubkey_serialize(&rp, pre_sig65, &cmprssd_len, 1);
+
     secp256k1_schnorrsig_challenge(&e, &pre_sig65[1], msg32, 32, pk_buf);
     secp256k1_scalar_mul(&e, &e, &sk);
     secp256k1_scalar_add(&e, &e, &k);
     secp256k1_scalar_get_b32(&pre_sig65[33], &e);
-    ret &= secp256k1_eckey_pubkey_serialize(&rp, pre_sig65, &cmprssd_len, 1);
 
     secp256k1_memczero(pre_sig65, 65, !ret);
     secp256k1_scalar_clear(&k);
@@ -233,7 +234,7 @@ int secp256k1_schnorr_adaptor_extract(const secp256k1_context *ctx, secp256k1_pu
     secp256k1_fe_get_b32(buf, &pk.x);
     secp256k1_schnorrsig_challenge(&e, &pre_sig65[1], msg32, 32, buf);
 
-    /* Compute R = s*G - e*P */
+    /* Compute R = s*G + (-e)*P */
     secp256k1_scalar_negate(&e, &e);
     secp256k1_gej_set_ge(&pkj, &pk);
     secp256k1_ecmult(&rj, &pkj, &e, &s);
@@ -245,12 +246,13 @@ int secp256k1_schnorr_adaptor_extract(const secp256k1_context *ctx, secp256k1_pu
      *
      * `adaptor_presign` negates the secret nonce k when R’.y is odd, during
      * the computation of the s value (i.e., presig[33:65]). Therefore, we need
-     * to negate R = k*G (if R'.y is odd) before subtracting it from R'.
+     * to negate R = k*G (if R'.y is odd) before subtracting it from R' = R + T.
      *
      *  T =  R' - R if R'.y is even
-     *    =  R' + R if R'.y is odd
+     *    =  R' + R  if R'.y is odd
      */
-    if (secp256k1_fe_is_odd(&rp.y)) {
+    secp256k1_fe_normalize_var(&rp.y);
+    if (!secp256k1_fe_is_odd(&rp.y)) {
         secp256k1_gej_neg(&rj, &rj);
     }
     secp256k1_gej_add_ge_var(&adaptor_gej, &rj, &rp, NULL);
