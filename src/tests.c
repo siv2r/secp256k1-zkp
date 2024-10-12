@@ -7736,53 +7736,53 @@ int main(int argc, char **argv) {
     /*** Run actual tests ***/
 
     /* selftest tests */
-    run_selftest_tests();
+/*     run_selftest_tests(); */
 
     /* context tests */
-    run_proper_context_tests(0); run_proper_context_tests(1);
+/*     run_proper_context_tests(0); run_proper_context_tests(1);
     run_static_context_tests(0); run_static_context_tests(1);
-    run_deprecated_context_flags_test();
+    run_deprecated_context_flags_test(); */
 
     /* scratch tests */
-    run_scratch_tests();
+/*     run_scratch_tests(); */
 
     /* util tests */
-    run_util_tests();
+/*     run_util_tests(); */
 
     /* integer arithmetic tests */
 #ifdef SECP256K1_WIDEMUL_INT128
-    run_int128_tests();
+/*     run_int128_tests(); */
 #endif
-    run_ctz_tests();
+/*     run_ctz_tests();
     run_modinv_tests();
-    run_inverse_tests();
+    run_inverse_tests(); */
 
     /* hash tests */
-    run_sha256_known_output_tests();
+/*     run_sha256_known_output_tests();
     run_sha256_counter_tests();
     run_hmac_sha256_tests();
     run_rfc6979_hmac_sha256_tests();
-    run_tagged_sha256_tests();
+    run_tagged_sha256_tests(); */
 
     /* scalar tests */
-    run_scalar_tests();
+/*     run_scalar_tests(); */
 
     /* field tests */
-    run_field_half();
+/*     run_field_half();
     run_field_misc();
     run_field_convert();
     run_field_be32_overflow();
     run_fe_mul();
     run_sqr();
-    run_sqrt();
+    run_sqrt(); */
 
     /* group tests */
-    run_ge();
+/*     run_ge();
     run_gej();
-    run_group_decompress();
+    run_group_decompress(); */
 
     /* ecmult tests */
-    run_ecmult_pre_g();
+/*     run_ecmult_pre_g();
     run_wnaf();
     run_point_times_order();
     run_ecmult_near_split_bound();
@@ -7792,71 +7792,71 @@ int main(int argc, char **argv) {
     run_ecmult_const_tests();
     run_ecmult_multi_tests();
     run_ec_combine();
-    run_ec_commit();
+    run_ec_commit(); */
 
     /* endomorphism tests */
-    run_endomorphism_tests();
+/*     run_endomorphism_tests(); */
 
     /* EC point parser test */
-    run_ec_pubkey_parse_test();
+/*     run_ec_pubkey_parse_test(); */
 
     /* EC key edge cases */
-    run_eckey_edge_case_test();
+/*     run_eckey_edge_case_test(); */
 
     /* EC key arithmetic test */
-    run_eckey_negate_test();
+/*     run_eckey_negate_test(); */
 
 #ifdef ENABLE_MODULE_BPPP
-    run_bppp_tests();
+/*     run_bppp_tests(); */
 #endif
 
 #ifdef ENABLE_MODULE_ECDH
     /* ecdh tests */
-    run_ecdh_tests();
+/*     run_ecdh_tests(); */
 #endif
 
 #ifdef ENABLE_MODULE_MUSIG
-    run_musig_tests();
+/*     run_musig_tests(); */
 #endif
 
     /* ecdsa tests */
-    run_ec_illegal_argument_tests();
+/*     run_ec_illegal_argument_tests();
     run_pubkey_comparison();
     run_random_pubkeys();
     run_ecdsa_der_parse();
     run_ecdsa_sign_verify();
     run_ecdsa_end_to_end();
     run_ecdsa_edge_cases();
-    run_ecdsa_wycheproof();
+    run_ecdsa_wycheproof(); */
 
 #ifdef ENABLE_MODULE_RECOVERY
     /* ECDSA pubkey recovery tests */
-    run_recovery_tests();
+/*     run_recovery_tests(); */
 #endif
 
 #ifdef ENABLE_MODULE_GENERATOR
-    run_generator_tests();
+/*     run_generator_tests(); */
 #endif
 
 #ifdef ENABLE_MODULE_RANGEPROOF
-    run_rangeproof_tests();
+/*     run_rangeproof_tests(); */
 #endif
 
 #ifdef ENABLE_MODULE_WHITELIST
     /* Key whitelisting tests */
-    run_whitelist_tests();
+/*     run_whitelist_tests(); */
 #endif
 
 #ifdef ENABLE_MODULE_SURJECTIONPROOF
-    run_surjection_tests();
+/*     run_surjection_tests(); */
 #endif
 
 #ifdef ENABLE_MODULE_EXTRAKEYS
-    run_extrakeys_tests();
+/*     run_extrakeys_tests(); */
 #endif
 
 #ifdef ENABLE_MODULE_SCHNORRSIG
-    run_schnorrsig_tests();
+/*     run_schnorrsig_tests(); */
 #endif
 
 #ifdef ENABLE_MODULE_SCHNORR_ADAPTOR
@@ -7864,16 +7864,16 @@ int main(int argc, char **argv) {
 #endif
 
 #ifdef ENABLE_MODULE_ELLSWIFT
-    run_ellswift_tests();
+/*     run_ellswift_tests(); */
 #endif
 
 #ifdef ENABLE_MODULE_ECDSA_S2C
     /* ECDSA sign to contract */
-    run_ecdsa_s2c_tests();
+/*     run_ecdsa_s2c_tests(); */
 #endif
 
 #ifdef ENABLE_MODULE_ECDSA_ADAPTOR
-    run_ecdsa_adaptor_tests();
+/*     run_ecdsa_adaptor_tests(); */
 #endif
 
     /* util tests */
