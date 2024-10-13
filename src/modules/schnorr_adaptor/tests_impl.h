@@ -103,64 +103,65 @@ static void run_nonce_function_schnorr_adaptor_tests(void) {
     CHECK(secp256k1_memcmp_var(nonce_z, nonce, 32) == 0);
 }
 
-/* static void test_schnorr_adaptor_api(void) {
+static void test_schnorr_adaptor_api(void) {
     unsigned char sk[32];
     unsigned char msg[32];
-    unsigned char secadaptor[32];
-    unsigned char adaptor33[33] = {
-        0x02, 0xC6, 0x04, 0x7F, 0x94, 0x41, 0xED, 0x7D,
-        0x6D, 0x30, 0x45, 0x40, 0x6E, 0x95, 0xC0, 0x7C,
-        0xD8, 0x5C, 0x77, 0x8E, 0x4B, 0x8C, 0xEF, 0x3C,
-        0xA7, 0xAB, 0xAC, 0x09, 0xB9, 0x5C, 0x70, 0x9E, 0xE5
-    };
     secp256k1_keypair keypair;
     secp256k1_keypair invalid_keypair = {{ 0 }};
     secp256k1_xonly_pubkey pk;
     secp256k1_xonly_pubkey zero_pk;
-    unsigned char sig[65];
-    unsigned char sig64[64];
-    secp256k1_pubkey t;
-    secp256k1_pubkey t2;
-    unsigned char extracted_secadaptor[32];
+    unsigned char pre_sig[65];
+    unsigned char invalid_pre_sig[65] = {{ 0 }};
+    unsigned char sig[64];
+    unsigned char sec_adaptor[32];
+    secp256k1_pubkey adaptor;
+    secp256k1_pubkey invalid_adaptor = {{ 0 }};
+    unsigned char extracted_sec_adaptor[32];
+    secp256k1_pubkey extracted_adaptor;
 
-    setup
-
+    /* setup */
     secp256k1_testrand256(sk);
     secp256k1_testrand256(msg);
-    secp256k1_testrand256(secadaptor);
+    secp256k1_testrand256(sec_adaptor);
+
     CHECK(secp256k1_keypair_create(CTX, &keypair, sk) == 1);
     CHECK(secp256k1_keypair_xonly_pub(CTX, &pk, NULL, &keypair) == 1);
     memset(&zero_pk, 0, sizeof(zero_pk));
-    secp256k1_ec_pubkey_parse(CTX, &t, adaptor33, 33);
+    CHECK(secp256k1_ec_pubkey_create(CTX, &adaptor, sec_adaptor) == 1);
 
-    main test body 
-    CHECK_ILLEGAL(STATIC_CTX, secp256k1_schnorr_adaptor_presign(STATIC_CTX, sig, msg, &keypair, &t, NULL));
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_presign(CTX, NULL, msg, &keypair, &t, NULL));
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_presign(CTX, sig, NULL, &keypair, &t, NULL));
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_presign(CTX, sig, msg, NULL, &t, NULL));
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_presign(CTX, sig, msg, &keypair, NULL, NULL));
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_presign(CTX, sig, msg, &invalid_keypair, &t, NULL));
+    /* main test body */
+    CHECK(CTX, secp256k1_schnorr_adaptor_presign(CTX, pre_sig, msg, &keypair, &adaptor, NULL) == 1);
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_presign(CTX, NULL, msg, &keypair, &adaptor, NULL));
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_presign(CTX, pre_sig, NULL, &keypair, &adaptor, NULL));
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_presign(CTX, pre_sig, msg, NULL, &adaptor, NULL));
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_presign(CTX, pre_sig, msg, &keypair, NULL, NULL));
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_presign(CTX, pre_sig, msg, &invalid_keypair, &adaptor, NULL));
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_presign(CTX, pre_sig, msg, &keypair, &invalid_adaptor, NULL));
+    CHECK_ILLEGAL(STATIC_CTX, secp256k1_schnorr_adaptor_presign(STATIC_CTX, pre_sig, msg, &keypair, &adaptor, NULL));
 
-    CHECK(secp256k1_schnorr_adaptor_presign(CTX, sig, msg, &keypair, &t, NULL) == 1);
-    CHECK(secp256k1_schnorr_adaptor_extract(CTX, &t2, sig, msg, &pk) == 1);
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract(CTX, NULL, sig, msg, &pk));
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract(CTX, &t2, NULL, msg, &pk));
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract(CTX, &t2, sig, NULL, &pk));
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract(CTX, &t2, sig, msg, NULL));
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract(CTX, &t2, sig, msg, &zero_pk));
+    CHECK(secp256k1_schnorr_adaptor_presign(CTX, pre_sig, msg, &keypair, &adaptor, NULL) == 1);
+    CHECK(secp256k1_schnorr_adaptor_extract(CTX, &extracted_adaptor, pre_sig, msg, &pk) == 1);
+    CHECK(secp256k1_memcmp_var(&extracted_adaptor, &adaptor, sizeof(adaptor)) == 0);
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract(CTX, NULL, pre_sig, msg, &pk));
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract(CTX, &extracted_adaptor, NULL, msg, &pk));
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract(CTX, &extracted_adaptor, pre_sig, NULL, &pk));
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract(CTX, &extracted_adaptor, pre_sig, msg, NULL));
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract(CTX, &extracted_adaptor, pre_sig, msg, &zero_pk));
 
-    CHECK(secp256k1_schnorr_adaptor_adapt(CTX, sig64, sig, secadaptor) == 1);
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_adapt(CTX, NULL, sig, secadaptor));
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_adapt(CTX, sig64, NULL, secadaptor));
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_adapt(CTX, sig64, sig, NULL));
+    CHECK(secp256k1_schnorr_adaptor_adapt(CTX, sig, pre_sig, sec_adaptor) == 1);
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_adapt(CTX, NULL, pre_sig, sec_adaptor));
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_adapt(CTX, sig, NULL, sec_adaptor));
+    /* invokes the ARG_CHECK on pre_sig[0] */
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_adapt(CTX, sig, invalid_pre_sig, sec_adaptor));
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_adapt(CTX, sig, pre_sig, NULL));
 
-    CHECK(secp256k1_schnorr_adaptor_adapt(CTX, sig64, sig, secadaptor) == 1);
-    CHECK(secp256k1_schnorr_adaptor_extract_sec(CTX, extracted_secadaptor, sig, sig64) == 1);
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract_sec(CTX, NULL, sig, sig64));
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract_sec(CTX, extracted_secadaptor, NULL, sig64));
-    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract_sec(CTX, extracted_secadaptor, sig, NULL));
-
-} */
+    CHECK(secp256k1_schnorr_adaptor_adapt(CTX, sig, pre_sig, sec_adaptor) == 1);
+    CHECK(secp256k1_schnorr_adaptor_extract_sec(CTX, extracted_sec_adaptor, pre_sig, sig) == 1);
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract_sec(CTX, NULL, pre_sig, sig));
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract_sec(CTX, extracted_sec_adaptor, NULL, sig));
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract_sec(CTX, extracted_sec_adaptor, invalid_pre_sig, sig));
+    CHECK_ILLEGAL(CTX, secp256k1_schnorr_adaptor_extract_sec(CTX, extracted_sec_adaptor, pre_sig, NULL));
+}
 
 /* Helper function for schnorr_adaptor_vectors
  * Signs the message and checks that it's the same as expected_presig. */
@@ -1150,8 +1151,7 @@ static void run_schnorr_adaptor_tests(void) {
     int i;
     run_nonce_function_schnorr_adaptor_tests();
 
-    /* test_schnorr_adaptor_api(); */
-    test_schnorrsig_sha256_tagged();
+    test_schnorr_adaptor_api();
     test_schnorr_adaptor_spec_vectors();
     for (i = 0; i < COUNT; i++) {
         test_schnorr_adaptor_presign();
