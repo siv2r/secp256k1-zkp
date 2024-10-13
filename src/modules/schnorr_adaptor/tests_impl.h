@@ -28,19 +28,14 @@ static void run_nonce_function_schnorr_adaptor_tests(void) {
     size_t algolen = sizeof(algo);
     secp256k1_sha256 sha;
     secp256k1_sha256 sha_optimized;
-    secp256k1_scalar adaptor_scalar;
-    secp256k1_gej tj;
-    secp256k1_ge tg;
     unsigned char nonce[32], nonce_z[32];
     unsigned char msg[32];
     unsigned char key[32];
-    unsigned char t[32];
-    unsigned char adaptor33[33];
+    unsigned char adaptor[33];
     unsigned char pk[32];
     unsigned char aux_rand[32];
     unsigned char *args[6];
     int i;
-    size_t size = 33;
 
     /* Check that hash initialized by
      * secp256k1_nonce_function_schnorr_adaptor_sha256_tagged has the expected
@@ -58,19 +53,17 @@ static void run_nonce_function_schnorr_adaptor_tests(void) {
 
     secp256k1_testrand256(msg);
     secp256k1_testrand256(key);
-    secp256k1_testrand256(t);
+    /* The random function below may generate an invalid (serialized) adaptor
+     * point, but for testing the nonce function, this invalid argument
+     * is acceptable. */
+    secp256k1_testrand_bytes_test(adaptor, sizeof(adaptor));
     secp256k1_testrand256(pk);
     secp256k1_testrand256(aux_rand);
-
-    secp256k1_scalar_set_b32(&adaptor_scalar, t, NULL);
-    secp256k1_ecmult_gen(&CTX->ecmult_gen_ctx, &tj, &adaptor_scalar);
-    secp256k1_ge_set_gej(&tg, &tj);
-    CHECK(secp256k1_eckey_pubkey_serialize(&tg, adaptor33, &size, 1) == 1);
 
     /* Check that a bitflip in an argument results in different nonces. */
     args[0] = msg;
     args[1] = key;
-    args[2] = adaptor33;
+    args[2] = adaptor;
     args[3] = pk;
     args[4] = algo;
     args[5] = aux_rand;
@@ -87,27 +80,26 @@ static void run_nonce_function_schnorr_adaptor_tests(void) {
     }
 
     /* NULL algo is disallowed */
-    CHECK(nonce_function_schnorr_adaptor(nonce, msg, key, t, pk, NULL, 0, NULL) == 0);
-    CHECK(nonce_function_schnorr_adaptor(nonce, msg, key, t, pk, algo, algolen, NULL) == 1);
+    CHECK(nonce_function_schnorr_adaptor(nonce, msg, key, adaptor, pk, NULL, 0, NULL) == 0);
+    CHECK(nonce_function_schnorr_adaptor(nonce, msg, key, adaptor, pk, algo, algolen, NULL) == 1);
     /* Other algo is fine */
     secp256k1_testrand_bytes_test(algo, algolen);
-    CHECK(nonce_function_schnorr_adaptor(nonce, msg, key, t, pk, algo, algolen, NULL) == 1);
+    CHECK(nonce_function_schnorr_adaptor(nonce, msg, key, adaptor, pk, algo, algolen, NULL) == 1);
 
+    /* Different algolen gives different nonce */
     for (i = 0; i < COUNT; i++) {
         unsigned char nonce2[32];
-        size_t algolen_tmp;
-
-        /* Different algolen gives different nonce */
         uint32_t offset = secp256k1_testrand_int(algolen - 1);
-        algolen_tmp = (algolen + offset) % algolen;
-        CHECK(nonce_function_schnorr_adaptor(nonce2, msg, key, t, pk, algo, algolen_tmp, NULL) == 1);
+        size_t algolen_tmp = (algolen + offset) % algolen;
+
+        CHECK(nonce_function_schnorr_adaptor(nonce2, msg, key, adaptor, pk, algo, algolen_tmp, NULL) == 1);
         CHECK(secp256k1_memcmp_var(nonce, nonce2, 32) != 0);
     }
 
     /* NULL aux_rand argument is allowed, and identical to passing all zero aux_rand. */
     memset(aux_rand, 0, 32);
-    CHECK(nonce_function_schnorr_adaptor(nonce_z, msg, key, t, pk, algo, algolen, &aux_rand) == 1);
-    CHECK(nonce_function_schnorr_adaptor(nonce, msg, key, t, pk, algo, algolen, NULL) == 1);
+    CHECK(nonce_function_schnorr_adaptor(nonce_z, msg, key, adaptor, pk, algo, algolen, &aux_rand) == 1);
+    CHECK(nonce_function_schnorr_adaptor(nonce, msg, key, adaptor, pk, algo, algolen, NULL) == 1);
     CHECK(secp256k1_memcmp_var(nonce_z, nonce, 32) == 0);
 }
 

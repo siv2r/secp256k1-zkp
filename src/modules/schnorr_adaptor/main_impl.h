@@ -66,7 +66,6 @@ static int nonce_function_schnorr_adaptor(unsigned char *nonce32, const unsigned
             masked_key[i] ^= key32[i];
         }
     } else {
-        /* TODO: check if ZERO_MASK is correct*/
         /* Precomputed TaggedHash("SchnorrAdaptor/aux", 0x0000...00); */
         static const unsigned char ZERO_MASK[32] = {
               65, 206, 231, 5, 44, 99, 30, 162,
