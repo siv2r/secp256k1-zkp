@@ -26,6 +26,10 @@ static void random_fe_non_zero(secp256k1_fe *nz) {
     } while (secp256k1_fe_is_zero(nz));
 }
 
+static void rand_flip_bit(unsigned char *array, size_t n) {
+    array[secp256k1_testrand_int(n)] ^= 1 << secp256k1_testrand_int(8);
+}
+
 static void ge_equals_ge(const secp256k1_ge *a, const secp256k1_ge *b) {
     CHECK(a->infinity == b->infinity);
     if (a->infinity) {
