@@ -328,6 +328,14 @@ int secp256k1_schnorr_adaptor_extract_sec(const secp256k1_context *ctx, unsigned
         return 0;
     }
 
+    /*TODO: should we parse presig[0:33] & sig[0:32], to make sure the presig &
+     * has valid public nonce point?
+     *
+     * But we don't care about their validity here right? Then why do we ARG_CHECK
+     * presig[0] parity byte?
+     *
+     * Here, the inputs are invalid but the output is valid :/  */
+
     secp256k1_scalar_negate(&s, &s);
     secp256k1_scalar_add(&t, &t, &s);
     /* `adaptor_adapt` negates the secret adaptor t when R’.y is odd, during
