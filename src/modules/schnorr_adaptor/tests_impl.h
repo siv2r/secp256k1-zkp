@@ -1,5 +1,5 @@
 /**********************************************************************
- * Copyright (c) 2023 Zhe Pang                                        *
+ * Copyright (c) 2023-2024 Zhe Pang and Sivaram Dhakshinamoorthy      *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
@@ -1200,6 +1200,55 @@ static void test_schnorr_adaptor_edge_cases(void) {
     }
 }
 
+static void test_schnorr_adaptor_correctness(void) {
+    unsigned char alice_sk[32];
+    secp256k1_keypair alice_keypair;
+    secp256k1_xonly_pubkey alice_pk;
+    unsigned char sec_adaptor[32];
+    secp256k1_pubkey adaptor;
+    unsigned char extracted_sec_adaptor[32];
+    secp256k1_pubkey extracted_adaptor;
+    unsigned char msg[32];
+    unsigned char pre_sig[65];
+    unsigned char sig[64];
+
+    /* Alice setup */
+    secp256k1_testrand256(alice_sk);
+    CHECK(secp256k1_keypair_create(CTX, &alice_keypair, alice_sk) == 1);
+    CHECK(secp256k1_keypair_xonly_pub(CTX, &alice_pk, NULL, &alice_keypair) == 1);
+
+    /* t := sec_adaptor
+     * There exists an adaptor T = t*G, where t is unknown to Bob */
+    secp256k1_testrand256(sec_adaptor);
+    CHECK(secp256k1_ec_pubkey_create(CTX, &adaptor, sec_adaptor));
+
+    /* Alice creates a pre-siganture for the adaptor point T,
+     * and sends it to Bob. */
+    secp256k1_testrand256(msg);
+    CHECK(secp256k1_schnorr_adaptor_presign(CTX, pre_sig, msg, &alice_keypair, &adaptor, NULL) == 1);
+
+    /* Bob extracts the adaptor point from the pre-signature,
+     * and verifies if it is equal to T */
+    CHECK(secp256k1_schnorr_adaptor_extract(CTX, &extracted_adaptor, pre_sig, msg, &alice_pk) == 1);
+    CHECK(secp256k1_ec_pubkey_cmp(CTX, &extracted_adaptor, &adaptor) == 0);
+
+    /* Bob learns t (the discrete logarithm of T). For example, Bob can
+     * pay a Lightning invoice that reveals t, assuming Lightning uses
+     * PTLC (Point Time Locked Contracts). */
+
+    /* Bob adapts the pre-signature with the discrete logarithm of T to
+     * create a valid BIP 340 Schnorr signature. */
+    CHECK(secp256k1_schnorr_adaptor_adapt(CTX, sig, pre_sig, sec_adaptor) == 1);
+    CHECK(secp256k1_schnorrsig_verify(CTX, sig, msg, sizeof(msg), &alice_pk) == 1);
+
+    /* Alice learns the BIP340 signature after Bob publishes it on the blockchain. */
+
+    /* Alice extracts the discrete logarithm of T from the pre-signature and the
+     * BIP 340 signature. */
+    CHECK(secp256k1_schnorr_adaptor_extract_sec(CTX, extracted_sec_adaptor, pre_sig, sig) == 1);
+    CHECK(secp256k1_memcmp_var(extracted_sec_adaptor, sec_adaptor, sizeof(extracted_sec_adaptor)) == 0);
+}
+
 static void run_schnorr_adaptor_tests(void) {
     int i;
     run_nonce_function_schnorr_adaptor_tests();
@@ -1209,6 +1258,7 @@ static void run_schnorr_adaptor_tests(void) {
     for (i = 0; i < COUNT; i++) {
         test_schnorr_adaptor_edge_cases();
     }
+    test_schnorr_adaptor_correctness();
 }
 
 #endif

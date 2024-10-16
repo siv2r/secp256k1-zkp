@@ -16,7 +16,7 @@
 #include <secp256k1_schnorr_adaptor.h>
 
 #include "examples_util.h"
-/* TODO: what's Z+A+B?*/
+/* TODO: make is clear, like multi_hop_tests of ECDSA adaptor */
 int main(void) {
     unsigned char msg[12] = "Hello World!";
     unsigned char msg_hash[32];
@@ -96,8 +96,7 @@ int main(void) {
 	assert(memcmp(sec_adaptor, extracted_sec_adaptor, sizeof(sec_adaptor)) == 0);
 
 	/* Alice subtracts out local blinding factor `b`, can now claim incoming
-	 * PTLC from Alice with sec_adaptor(=z+a)
-	 */
+	 * PTLC from Alice with sec_adaptor(=z+a) */
 
 	printf("Success!\n\n");
 	secp256k1_context_destroy(ctx);
